@@ -1,0 +1,76 @@
+alias currentPID S0; //1024 is the location of  process page table reg.Hence calculating the no of page tables,
+currentPID = (PTBR - 1024) / 8; //btw the current PTBR will give the process number.
+
+alias currentPCB S1;
+currentPCB = READY_LIST + currentPID * 32; //
+
+[currentPCB + 1] =1; //setting the current process into READY STATE
+
+[currentPCB + 2] = BP;	 //when the interrupt is called , IP is stored in the location pointed by SP
+[currentPCB + 3] = SP-1; // Hence the actual stack pointe position is 1 below the current SP value.
+
+
+alias physicalSP S2; // OFFSET = SP %512; location of physical page no from page table => PTBR + 2*(SP/512)
+physicalSP = ([PTBR + 2*(SP /512)] * 512) + (SP % 512); //	
+
+[currentPCB + 4] = [physicalSP]; // IP is found from the physical location of SP
+[currentPCB + 5] = PTBR;
+[currentPCB + 6] = PTLR;
+
+[currentPCB + 7] = R0;
+[currentPCB + 8] = R1;
+[currentPCB + 9] = R2;
+[currentPCB + 10] = R3;
+[currentPCB + 11] = R4;	//process registers R0 - R7
+[currentPCB + 12] = R5;
+[currentPCB + 13] = R6;
+[currentPCB + 14] = R7;
+
+alias count S3;
+alias newPCB S4;
+count = 1;
+
+
+
+//if(currentPID == 0) then
+//	newPID = 1;
+//else
+//	newPID = 0;
+//endif;
+//newPCB = READY_LIST + currentPID * 32;
+
+while (count <= 32) do //**********************************************
+	if( [READY_LIST + ((currentPID + count) % 32) * 32 + 1 ] == 1) then
+		newPCB = (READY_LIST + ((currentPID + count) % 32) * 32);
+		break;
+	endif;
+	count = count + 1;
+endwhile; //***********************************************************
+
+BP = [newPCB + 2];	 
+SP = [newPCB + 3]; 
+
+// IP is changed when iReturn is called. DO NOT CHANGE IT EXPLICITLY!!
+
+PTBR = [newPCB + 5];
+PTLR = [newPCB + 6];
+
+R0 = [newPCB + 7];
+R1 = [newPCB + 8];
+R2 = [newPCB + 9];
+R3 = [newPCB + 10];
+R4 = [newPCB + 11];
+R5 = [newPCB + 12];
+R6 = [newPCB + 13];
+R7 = [newPCB + 14];
+
+// NOW to setup IP so that Ireturn will automatically Set It.
+
+SP = SP +1; //To store on in top of the STACK
+alias newPhysicalSP S5;
+
+newPhysicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+[newPhysicalSP] = [newPCB + 4]; // Set value on top of stack as IP stored in PCB
+
+[newPCB + 1] = 2; //setting the new process into RUNNING STATE
+ireturn;

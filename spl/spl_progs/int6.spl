@@ -1,0 +1,173 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallNo S1;
+sysCallNo = [physicalSP - 1]; 		//System call No is just Below the IP on the stack, as INT will save IP on TOP.
+
+if (sysCallNo == 9) then			// E X E C
+	alias filename S2;
+	alias i S3;
+	alias basicBlock S4;
+	alias counter S5;
+	alias validPages S6;
+	alias k S7;
+	alias j S8;
+	alias currentPCB S9;
+	alias fileTableIndex S10;
+
+
+	filename = [physicalSP - 3];
+
+	i=0;
+	while (i<64) do 
+		if ([FAT + i*8] == filename	) then
+			break;
+		endif;
+		i =i +1;
+	endwhile;
+
+	if (i == 64) then
+		print("ExecFlnEr");
+		[physicalSP - 2] = -1; 							//No File with such a name Exists
+		ireturn;
+	endif;
+
+	basicBlock = [FAT + i*8 + 2];
+
+	load (1,basicBlock); 								//Loading Basic Block in to Scratch Pad
+
+	i=0;
+	counter = 0;
+	while (i < 3) do
+		if([SCRATCHPAD + i] != -1) then
+			counter = counter + 1;
+		endif;
+
+		if (counter == 2) then
+			break;
+		endif;
+
+		//if (counter >= 3) then
+		//		print("InvExecFl");
+		//		[physicalSP - 2] = -1; 					//Inv Exec File
+		//		ireturn;		
+		//endif;
+
+		if ([SCRATCHPAD + i] == -1) then
+			break;
+		endif;
+		
+		i = i + 1;
+	endwhile;
+
+	//print("Counter");
+	//print(counter);
+
+	validPages = 0;
+	i =0;
+	while (i<3) do
+		if( [PTBR  + i*2 + 1] == "01" || [PTBR  + i*2 + 1]== "11") then
+			validPages = validPages + 1; 				//dont include stack page
+		endif;
+		i = i + 1;
+	endwhile;
+
+	if(validPages > counter) then
+		i = validPages - counter;
+
+		if (i<2) then
+			i = 3 - i; 									// Deallocate Pages in Page Table From the Back
+		endif;
+		while  (i>0) do
+			[MEM_LIST + [PTBR + 2*i]] = 0; 				//Setting Extra pages as 0
+			[PTBR + 2*i] = -1;
+			[PTBR + 2*i + 1] = "00"; 					//Invalidate the Page Table Entry For Extra Pages
+			i = i -1;
+		endwhile;
+
+		else // <counter > validPages> We need Extra pages For allocation, Hence Search memory Free List
+			
+			i = 25;
+			k = counter - validPages; 					//extra pages
+
+			while (k>0 && i < 64) do
+				if([MEM_LIST + i] == 0) then
+					k = k - 1;
+				endif;
+				i = i + 1;								//testing if enough memory is there
+			endwhile;
+
+			if (i == 64) then
+				print("ExecMemEr");
+				[physicalSP - 2] = -1; 					//No Free Space in Memory
+				ireturn;	
+			endif;
+
+			i=25;
+			k = counter - validPages; 					//extra pages
+			while (i<64 && k > 0) do
+				if( [MEM_LIST + i] == 0) then
+					j = 0;
+					while( j<3)   do
+						if ([PTBR  + j*2 + 1] == "01" || [PTBR  + j*2 + 1]== "11") then
+							j = j + 1;
+						
+						else
+							break;						//Finding the invalid page
+						endif;
+					endwhile;
+
+					[PTBR  + j*2] = i;
+					[MEM_LIST + i] = 1;
+					k = k - 1;
+				endif;
+				i = i + 1;
+			endwhile;		
+	endif;
+
+	[PTBR + 7] = "01"; 									//Setting stack page as valid
+
+	load(1,basicBlock);
+	i =0;
+	while (i<counter) do
+		if([PTBR + 2*i] > 24) then
+			load ([PTBR + 2*i],[SCRATCHPAD + i]);		//loading all the pages of new process in to Memory
+			[PTBR + 2*i + 1] = "01";
+
+		else
+			print("ExecInvWr");
+		endif;
+
+		i = i + 1;
+	endwhile;
+
+	currentPCB = READY_LIST + ((PTBR - 1024)/8)*32 ;
+	i =0 ;
+	while(i<8) do
+		fileTableIndex =[currentPCB + 15 + i*2];		//closing opened Files
+		if(fileTableIndex != -1) then	
+			[FILE_TABLE + fileTableIndex*2 + 1] = [FILE_TABLE + fileTableIndex*2 + 1] - 1;
+
+			if ([FILE_TABLE + fileTableIndex*2 + 1] == 0) then
+				[FILE_TABLE + fileTableIndex*2 + 1] = -1;
+			endif;
+
+			[currentPCB + 15 + i*2] = -1;
+			[currentPCB + 15 + i*2 + 1] = -1;
+		endif;
+
+		i = i + 1;
+	endwhile;
+
+	SP = 3 * 512;										//stack is initialised as its initial logical value
+	physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+	[physicalSP] = 0;									//setting IP value as 0 for Child;
+
+	breakpoint;
+	ireturn;
+
+	else 
+		print("ExecSysEr");
+		halt;
+endif;

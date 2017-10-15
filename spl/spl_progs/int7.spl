@@ -1,0 +1,104 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+
+alias sysCallNo S1;
+sysCallNo = [physicalSP - 1]; 		//System call No is just Below the IP on the stack, as INT will save IP on TOP.
+
+if (sysCallNo == 10) then			// E X I T
+	alias i S2;
+	alias flag S3;
+	alias currentPCB S4;
+	alias filetableindex S5;
+	alias currentPID S6;
+	alias newPCB S7;
+	alias newPhysicalSP S8;
+
+	i = 0;
+	flag = 0;
+	while (i < 32) do
+		if([READY_LIST + i*32 + 1] == 1) then
+			flag=1; // checking for other ready state Process
+			break;
+		endif;
+
+		i = i + 1;
+	endwhile;
+ 
+
+	if(flag == 0) then
+		halt; // Halt the machine as no other process is Ready
+	endif;
+
+	currentPCB = READY_LIST + ((PTBR - PAGE_TABLE) / 8 ) * 32; // PID = ((PTBR - PAGE_TABLE) / 8 )
+	currentPID = (PTBR - PAGE_TABLE) / 8 ;
+
+	i = 0;
+	while (i < 8) do
+		if([currentPCB + 15 + i * 2] != -1) then
+			filetableindex = [currentPCB + 15 + i*2 ];
+			[FILE_TABLE + filetableindex * 2 + 1 ] = [FILE_TABLE + filetableindex * 2 + 1] - 1;						//close all open files	
+
+			if ([FILE_TABLE + filetableindex * 2 + 1 ] == 0) then
+				[FILE_TABLE + filetableindex * 2 + 1 ] = -1;
+			endif;
+
+			[currentPCB + 15 + i * 2] = -1;
+			[currentPCB + 15 + i * 2 + 1] = -1;
+		endif;
+		i = i + 1;
+	endwhile;
+
+	[currentPCB + 1] = 0; //State as Terminated
+
+	i = 0;
+	while (i<4) do
+		if( [PAGE_TABLE + currentPID*8 + i*2 + 1] == "01" || [PAGE_TABLE + currentPID*8 + i*2 + 1] == "11") then
+			[MEM_LIST + [[PAGE_TABLE + currentPID*8 + i*2]]] = 0; 													//Decrement value of Memlist to 0. ie unoccupied
+		endif;
+
+		[PAGE_TABLE + currentPID*8 + i*2] = -1;
+		[PAGE_TABLE + currentPID*8 + i*2 + 1] = "00";
+		i = i +1;
+	endwhile;
+
+	i = 0;
+	while (i<32) do
+		if([READY_LIST + ((currentPID + i) % 32)*32 + 1] == 1) then
+			newPCB = READY_LIST + ((currentPID + i) % 32)*32;
+			break;	//circularly searching READY_LIST for Ready Process
+		endif;
+		i = i + 1;
+	endwhile;
+						//Change To New Excecuting Process
+	BP = [newPCB + 2];	 
+	SP = [newPCB + 3]; 
+
+	// IP is changed when iReturn is called. DO NOT CHANGE IT EXPLICITLY!!
+
+	PTBR = [newPCB + 5];
+	PTLR = [newPCB + 6];
+
+	R0 = [newPCB + 7];
+	R1 = [newPCB + 8];
+	R2 = [newPCB + 9];
+	R3 = [newPCB + 10];
+	R4 = [newPCB + 11];
+	R5 = [newPCB + 12];
+	R6 = [newPCB + 13];
+	R7 = [newPCB + 14];
+
+
+	SP = SP +1; //To store on in top of the STACK
+
+
+	newPhysicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
+	[newPhysicalSP] = [newPCB + 4]; // Set value on top of stack as IP stored in PCB
+
+	[newPCB + 1] = 2; //setting the new process into RUNNING STATE
+	print("Exit");
+	ireturn;
+
+	else
+		print("ExiSysErr");
+		halt;
+endif;
