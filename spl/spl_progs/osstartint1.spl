@@ -96,6 +96,7 @@ PTLR = 4; 					// each process 4 pages										//
 							// and exception hanlder is not invoked in Kernel
 																					// P. C. B  - S E T U P
 [READY_LIST + 0*32 + 1] = 2;//Setting Process State (in 2nd bit in PCB) as 2 (Runing)
+[READY_LIST + 0*32 + 31] = 0; // parent of INIT is INIT itself
 
 counter=15;
 while (counter < 31) do

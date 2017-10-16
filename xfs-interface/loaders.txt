@@ -16,6 +16,8 @@ load --init $HOME/myxos/apl/apl_progs/initopen.xsm
 load --init $HOME/myxos/apl/apl_progs/merge.xsm
 load --init $HOME/myxos/apl/apl_progs/forked.xsm
 load --init $HOME/myxos/apl/apl_progs/exhandled.xsm
+load --init ../apl/apl_progs/shell.xsm
+
 
 
 
@@ -26,6 +28,8 @@ load --init $HOME/myxos/apl/apl_progs/exhandled.xsm
 ./spl --int=5 spl_progs/int5.spl
 ./spl --int=6 spl_progs/int6.spl
 ./spl --int=7 spl_progs/int7.spl
+./spl --os spl_progs/osstartint1.spl
+./spl --int=timer spl_progs/sample_timer.spl
 
 ./spl --exhandler spl_progs/exhandler.spl
 ./spl --os spl_progs/osstartint1.spl 

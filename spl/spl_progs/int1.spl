@@ -16,7 +16,7 @@ if (sysCallNo == 1) then    	//C R E A T E -------------------------------------
 	
 	while (i < 512) do
 		if([FAT + i]==filename) then
-			[physicalSP - 2] = 0;// File EXISTS and set RETURN values as 0 -> SUCCESS and return
+			[physicalSP - 2] = 0;// File EXISTS and set RETURN values as 0 -> SUCCESS
 			ireturn;
 			break;
 		endif;
@@ -146,7 +146,7 @@ if (sysCallNo == 4) then				// D E L E T E -------------------------------------
 
 			k=0;
 			while (k<512) do
-				 [SCRATCHPAD +k] ="";
+				[SCRATCHPAD +k] ="";
 				k=k+1;
 			endwhile;
 	

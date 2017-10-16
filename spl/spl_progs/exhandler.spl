@@ -32,10 +32,6 @@ if (Cause != 0) then
 	inline "JMP 11776"; 			//Exit Interrupt Routine in 23rd page (23*512= 11776)
 endif;
 
-
-
-
-
 //------------------------------------Page Fault exception-------------------------------------
 	
 
