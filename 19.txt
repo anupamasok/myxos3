@@ -38,9 +38,9 @@ merge.xsm
 
 
 
--1
-0
--1
+prime.xsm
+512
+36
 
 
 

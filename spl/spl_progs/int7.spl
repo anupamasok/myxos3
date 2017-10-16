@@ -26,6 +26,7 @@ if (sysCallNo == 10) then			// E X I T
  
 
 	if(flag == 0) then
+		print("Exit");
 		halt; // Halt the machine as no other process is Ready
 	endif;
 
@@ -36,10 +37,11 @@ if (sysCallNo == 10) then			// E X I T
 	while (i < 8) do
 		if([currentPCB + 15 + i * 2] != -1) then
 			filetableindex = [currentPCB + 15 + i*2 ];
+
 			[FILE_TABLE + filetableindex * 2 + 1 ] = [FILE_TABLE + filetableindex * 2 + 1] - 1;						//close all open files	
 
 			if ([FILE_TABLE + filetableindex * 2 + 1 ] == 0) then
-				[FILE_TABLE + filetableindex * 2 + 1 ] = -1;
+				[FILE_TABLE + filetableindex * 2] = -1;
 			endif;
 
 			[currentPCB + 15 + i * 2] = -1;
@@ -52,17 +54,23 @@ if (sysCallNo == 10) then			// E X I T
 
 	i = 0;
 	while (i<4) do
-		if( [PAGE_TABLE + currentPID*8 + i*2 + 1] == "01" || [PAGE_TABLE + currentPID*8 + i*2 + 1] == "11") then
-			[MEM_LIST + [[PAGE_TABLE + currentPID*8 + i*2]]] = 0; 													//Decrement value of Memlist to 0. ie unoccupied
+		if( [PTBR+ i*2 + 1] == "01" || [PTBR + i*2 + 1] == "11") then
+			[MEM_LIST + [PTBR + i*2] ] = [MEM_LIST + [PTBR + i*2] ] -1; 	//Decrement value of Memlist as to decrement concurrent open instances of file in processes
+		
+		else
+			if ([PTBR + i*2] >= 448) then
+				[DISK_LIST + [PTBR + i*2]] = [DISK_LIST + [PTBR + i*2]] - 1; //Decrement value of Disk Free list as to decrement
+				store(6,20); 												 //concurrent open instances of file in processes				
+			endif;
 		endif;
 
-		[PAGE_TABLE + currentPID*8 + i*2] = -1;
-		[PAGE_TABLE + currentPID*8 + i*2 + 1] = "00";
+		[PTBR + i*2] = -1;
+		[PTBR + i*2 + 1] = "00";
 		i = i +1;
 	endwhile;
 
 	i = 0;
-	while (i<32) do
+	while (i < 32) do
 		if([READY_LIST + ((currentPID + i) % 32)*32 + 1] == 1) then
 			newPCB = READY_LIST + ((currentPID + i) % 32)*32;
 			break;	//circularly searching READY_LIST for Ready Process

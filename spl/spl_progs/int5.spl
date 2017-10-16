@@ -15,9 +15,10 @@ if (sysCallNo == 8) then			// F O R K
 	alias currentPCB S9;
 	alias childPhysicalSP S10;
 
-	print("In Fork");
+	//print("In Fork");
 
-	breakpoint;
+	
+
 
 	flag = 0;
 	childPID=0;
@@ -25,7 +26,7 @@ if (sysCallNo == 8) then			// F O R K
 		if( [READY_LIST + childPID*32 + 1] == 0) then	
 			flag = 1; 				// Finding Free PCBs in terminated state
 			break;					// Found Free in childPID
-		endif;0
+		endif;
 
 		childPID = childPID + 1;
 	endwhile;	
@@ -36,85 +37,62 @@ if (sysCallNo == 8) then			// F O R K
 		ireturn;
 	endif;
 
-	breakpoint;
-
-
 	childPCB = READY_LIST + childPID*32;
 	[childPCB + 0] = childPID; 		//Set the PID as childPID of Free PCB in Ready List (Standard in XOS)
 	
 
-
-	
-	i=0;							//Check No of Valid Pages in the Process
-	k=0;
-	while (i < 4) do
-		if([PTBR + i*2 + 1] == "01" || [PTBR + i*2 + 1] == "11") then
-			k = k + 1;				//valid page
-		endif;
-		i =i + 1;
-	endwhile;
-
-	breakpoint;
-
-	i = 25;
-	j = 0;
-	flag = 0;
+									//Stage 10 Changes
+	i = 0;
+	flag = 0;	
 	while (i < 64) do
 		if ([MEM_LIST + i] == 0) then
-			j = j + 1;
+			[MEM_LIST + i] = 1;		//we use that free page for stack
+			flag = 1;				//Checking MEM LIST For 1 Free page to store Stack
+			break;					//Free page in i
 		endif;
-		if(j >= k) then
-			flag = 1;				//Checking the open pages of the Page Tables. 
-			break;
-		endif;
-
 		i = i + 1;
 	endwhile;
 
+
 	if (flag == 0) then
-		[physicalSP - 2] = -1; 		//Failure!! NO FREE Space in Mem Free List For Open Pages
+		print("FrkErrSta");
+		[physicalSP - 2] = -1; 		//Failure!! NO FREE Space in Mem Free List For Child Stack
 		ireturn;
 	endif;
 
-	breakpoint;
 
+	j =0;
+	while (j < 512) do
+		[i * 512 + j] = [[PTBR + 3*2] * 512 + j];		//Copy contents of the Parent Stack to Child Stack Word By Word
+		j = j + 1;
+	endwhile;
 
-	i=0;
-	childPTBR = PAGE_TABLE + childPID * 8; 								//PTBR = syswidepagetable + PID*8;
+	childPTBR = PAGE_TABLE + childPID * 8; 				//PTBR = syswidepagetable + PID*8;
 	
+	[childPTBR + 2*3] = i;
+	[childPTBR + 2*3 + 1] = "01"; 						//Setting stack for child and setting As Valid Unreferenced
+	[MEM_LIST + i] = 1; 								//Setting allocated stack page as Used in Memory Free List
+
+
 
 	i=0;
-	while (i < 4) do
-		[childPTBR + 2*i] = [PTBR + i*2];								//copying all  from Page Table of the parents
+	while (i < 3) do
+		[childPTBR + 2*i] = [PTBR + i*2];				//copying all  from Page Table of the parents except the stack
 		[childPTBR + 2*i + 1] = [PTBR + i*2 + 1];
-		i =i + 1;
-	endwhile;
 
-
-	i=0;
-	k=25;
-	while (i < 4) do
-		if([PTBR + i*2 + 1] == "01" || [PTBR + i*2 + 1] == "11") then
-			while (k < 64) do
-				if( [MEM_LIST + k] == 0 ) then
-					j=0;
-					while (j < 512) do
-						[k * 512 + j] = [[PTBR + i*2] * 512 + j];		//Find Page k from memlist and then store value from Current Valid Page Word by word.
-						j = j + 1;
-					endwhile;			
-
-					[childPTBR + 2*i] = k;								//value of the page is found in k
-					[childPTBR + 2*i + 1] = [PTBR + i*2 + 1];			//Copy values of parents table to childs
-					[MEM_LIST + k] = 1; 								//Set the value as occupied
-					break;
-				endif;
-				k = k +1;
-			endwhile;	
+		if([PTBR + i*2 + 1] == "01" || [PTBR + i*2 + 1] == "11") then	 // If the page is valid
+			[MEM_LIST + [PTBR + i*2] ] = [MEM_LIST + [PTBR + i*2] ] + 1; //indicate that the page shared by more than 1 process 
+		else															 //If the page Invalid
+			if ([PTBR + i*2] >= 448) then
+				[DISK_LIST + [PTBR + i*2] ] = [DISK_LIST + [PTBR + i*2] ] + 1;	//swap block is shared by more than 1 process
+				store (6,20);
+			endif;
 		endif;
+
 		i =i + 1;
 	endwhile;
 
-	breakpoint;
+
 										// SETTING CHILD PCB	
 
 										//Except for IP SP and PTBR ,REST ARE THE SAME
@@ -156,7 +134,7 @@ if (sysCallNo == 8) then			// F O R K
 	childPhysicalSP = ([childPTBR + 2 * ((SP-1) / 512)] * 512) + ((SP-1) % 512);
 	[childPhysicalSP - 1] = -2; 	//child has return value -2 (-1 because IP is not stored)
 
-	breakpoint;
+	
 	ireturn;
 
 	else
