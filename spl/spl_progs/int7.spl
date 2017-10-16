@@ -4,7 +4,7 @@ physicalSP = ([PTBR + 2 * (SP / 512)] * 512) + (SP % 512);
 alias sysCallNo S1;
 sysCallNo = [physicalSP - 1]; 		//System call No is just Below the IP on the stack, as INT will save IP on TOP.
 
-if (sysCallNo == 10) then			// E X I T
+
 	alias i S2;
 	alias flag S3;
 	alias currentPCB S4;
@@ -12,9 +12,26 @@ if (sysCallNo == 10) then			// E X I T
 	alias currentPID S6;
 	alias newPCB S7;
 	alias newPhysicalSP S8;
+	alias  WaitingPID S9;
+	alias  WaitingPCB S10;
 
+	currentPCB = READY_LIST + ((PTBR - PAGE_TABLE) / 8 ) * 32; // PID = ((PTBR - PAGE_TABLE) / 8 )
+	currentPID = (PTBR - PAGE_TABLE) / 8 ;
+
+if (sysCallNo == 10) then			//----------------------- E X I T --------------------------------------------------------------------------------
 	i = 0;
+
+	
+	i = 0;																	//STOP other processes from WAITING for current process
+	while (i < 32) do
+		if([READY_LIST + i*32 + 1] == 100 + currentPID) then
+			[READY_LIST + i*32 + 1] = 1; 				
+		endif;
+		i = i + 1;
+	endwhile;
+
 	flag = 0;
+	i=0;
 	while (i < 32) do
 		if([READY_LIST + i*32 + 1] == 1) then
 			flag=1; // checking for other ready state Process
@@ -29,9 +46,6 @@ if (sysCallNo == 10) then			// E X I T
 		print("Exit");
 		halt; // Halt the machine as no other process is Ready
 	endif;
-
-	currentPCB = READY_LIST + ((PTBR - PAGE_TABLE) / 8 ) * 32; // PID = ((PTBR - PAGE_TABLE) / 8 )
-	currentPID = (PTBR - PAGE_TABLE) / 8 ;
 
 	i = 0;
 	while (i < 8) do
@@ -58,9 +72,9 @@ if (sysCallNo == 10) then			// E X I T
 			[MEM_LIST + [PTBR + i*2] ] = [MEM_LIST + [PTBR + i*2] ] -1; 	//Decrement value of Memlist as to decrement concurrent open instances of file in processes
 		
 		else
-			if ([PTBR + i*2] >= 448) then
+			if ([PTBR + i*2] >= 448) then									 //invalid and belongs to Swap area
 				[DISK_LIST + [PTBR + i*2]] = [DISK_LIST + [PTBR + i*2]] - 1; //Decrement value of Disk Free list as to decrement
-				store(6,20); 												 //concurrent open instances of file in processes				
+				store(6,20); 												 //concurrent open instances of file in processes (as th current process is Exiting)	
 			endif;
 		endif;
 
@@ -68,6 +82,62 @@ if (sysCallNo == 10) then			// E X I T
 		[PTBR + i*2 + 1] = "00";
 		i = i +1;
 	endwhile;
+
+endif;
+
+	
+if (sysCallNo == 13) then		//------------------------------------------- W A I T ----------------------------------------------
+	
+	WaitingPID = [physicalSP - 3];
+	WaitingPCB = READY_LIST + 32*WaitingPID;
+
+	if (WaitingPID < 0 || WaitingPID >= 32) then	//check for invalid PID
+		print("waiterr");
+		[physicalSP - 2]=-1;
+		ireturn;				//an invalid PID
+	endif;
+
+	if (WaitingPID == currentPID || [WaitingPCB + 1] == 0) then
+		[physicalSP - 2]=-1;	
+		print("waitErr1");	//err as process asking to wait for itself (ie currently running process or a terminated process)
+		ireturn;
+	endif;
+
+
+	[currentPCB + 1] = 100 + WaitingPID;		//change State of current Process to 100 + WaitingPID
+	[currentPCB + 2] = BP;
+	[currentPCB + 3] = SP-1;
+	[currentPCB + 4] = [physicalSP];
+	[currentPCB + 5] = PTBR;
+	[currentPCB + 6] = PTLR;
+	[currentPCB + 7] = R0;
+	[currentPCB + 8] = R1;
+	[currentPCB + 9] = R2;
+	[currentPCB + 10] = R3;
+	[currentPCB + 11] = R4;
+	[currentPCB + 12] = R5;
+	[currentPCB + 13] = R6;
+	[currentPCB + 14] = R7;
+
+	[physicalSP - 2]=0;							//prepare for context switch
+
+endif;
+
+
+if (sysCallNo == 14) then					//------------------------- S I G N A L ------------------------------------------------------
+	i = 0;																	//STOP other processes from WAITING for current process
+	while (i < 32) do
+		if([READY_LIST + i*32 + 1] == 100 + currentPID) then
+			[READY_LIST + i*32 + 1] = 1; 				
+		endif;
+		i = i + 1;
+	endwhile;
+
+	[physicalSP - 2] = 0;
+	ireturn;
+endif;
+
+if ((sysCallNo == 10) || (sysCallNo == 13)) then 	//-------- W A I T - O R - E X I T -----------------------------------------------------------------------
 
 	i = 0;
 	while (i < 32) do
@@ -77,11 +147,11 @@ if (sysCallNo == 10) then			// E X I T
 		endif;
 		i = i + 1;
 	endwhile;
-						//Change To New Excecuting Process
+							//Change To New Excecuting Process
 	BP = [newPCB + 2];	 
 	SP = [newPCB + 3]; 
 
-	// IP is changed when iReturn is called. DO NOT CHANGE IT EXPLICITLY!!
+	// IP is changed when ireturn is called. DO NOT CHANGE IT EXPLICITLY!!
 
 	PTBR = [newPCB + 5];
 	PTLR = [newPCB + 6];
@@ -103,10 +173,7 @@ if (sysCallNo == 10) then			// E X I T
 	[newPhysicalSP] = [newPCB + 4]; // Set value on top of stack as IP stored in PCB
 
 	[newPCB + 1] = 2; //setting the new process into RUNNING STATE
+
 	print("Exit");
 	ireturn;
-
-	else
-		print("ExiSysErr");
-		halt;
 endif;

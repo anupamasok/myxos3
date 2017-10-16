@@ -14,6 +14,9 @@ if (sysCallNo == 8) then			// F O R K
 	alias childPTBR S8;
 	alias currentPCB S9;
 	alias childPhysicalSP S10;
+	alias pageIndex S11;
+	alias pageNum S12;
+	alias counter S13;
 
 	//print("In Fork");
 
@@ -54,10 +57,76 @@ if (sysCallNo == 8) then			// F O R K
 	endwhile;
 
 
-	if (flag == 0) then
-		print("FrkErrSta");
-		[physicalSP - 2] = -1; 		//Failure!! NO FREE Space in Mem Free List For Child Stack
-		ireturn;
+	if (flag == 0) then		//Failure!! NO FREE Space in Mem Free List For Child Stack
+
+		pageIndex = 0;	//scanning starts from 0
+		counter = 0;
+
+		while (1) do
+			//print("*");							//loop until it finds a  page to replace
+			if (counter == 256) then
+				[physicalSP - 2]=-1;
+				ireturn;
+			endif;
+
+			if (pageIndex >= 256) then
+				pageIndex=pageIndex-256;
+			endif;
+
+
+			if ((pageIndex % 8) == 6) then
+				pageIndex = pageIndex + 2; //skip stack pages as it cannot be considered for replacement
+				//print("^");
+				counter = counter + 1;
+				continue;			
+			endif;
+
+			if ([PAGE_TABLE + pageIndex + 1] == "01") then	//Valid Unreferenced. Meant For ReplaceMent
+				if ([MEM_LIST + [PAGE_TABLE + pageIndex] ] > 1) then
+					pageIndex = pageIndex + 2; //Skip page as page shared in another process
+					counter = counter + 1;
+					continue;
+				endif;
+
+						 //At this point we have found the page to replace in pageIndex
+
+				j = 448; //to find a free swap block in DFL in disk
+				while (j < 512) do
+					if([DISK_LIST + j] == 0) then
+						break;
+					endif;
+					j = j + 1;
+				endwhile;
+
+				if(j == 512) then		//No Free Space, Hence the process must be made to EXIT
+					print "FrkExit3";	
+					[physicalSP + 1] = 10;			//Pass the System Call No. For EXIT
+					SP = SP + 2;					//2 space. -> 1 for Sys Call No. 1 for IP on top of it.
+					inline "JMP 11776"; 			//Exit Interrupt Routine in 23rd page (23*512= 11776)
+				endif;
+
+				store([PAGE_TABLE + pageIndex],j); //store into the swap location found
+				[DISK_LIST + j] = 1;
+				store (6,20);
+
+				pageNum = [PAGE_TABLE + pageIndex];	  //pageNum is the page we want to load the page into
+				[MEM_LIST + pageNum]=1;
+				i = pageNum;						//free page stored to i
+
+				[PAGE_TABLE + pageIndex] = j;		  
+				[PAGE_TABLE + pageIndex + 1] = "00";  //Set as invalid. So that the exception will make it load into MEMORY next time
+
+				break;								 //Important to Break				
+			endif;
+
+			if ([PAGE_TABLE + pageIndex + 1] == "11") then
+				[PAGE_TABLE + pageIndex + 1] = "01"; 			  //Referenced is set as Unreferenced in Second Chance algorithm
+			endif;
+
+			pageIndex = pageIndex + 2;
+			counter = counter + 1;
+		endwhile;
+
 	endif;
 
 

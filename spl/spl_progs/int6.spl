@@ -21,7 +21,7 @@ if (sysCallNo == 9) then			// E X E C
 	i=0;
 	while (i<64) do 
 		if ([FAT + i*8] == filename	) then
-			break;
+			break;										
 		endif;
 		i =i +1;
 	endwhile;
@@ -45,7 +45,8 @@ if (sysCallNo == 9) then			// E X E C
 		i = i + 1;
 	endwhile;		
 
-	if (i >= 2)  then
+	if (i > 3)  then
+		breakpoint;				//3 since the loop should break at exaclty the first invalid code block which is at location 3
 		print("ExecMemEr");		//Process has excess Pages
 		[physicalSP -2] =-1;
 		ireturn;
@@ -100,6 +101,20 @@ if (sysCallNo == 9) then			// E X E C
 	ireturn;
 
 	else 
-		print("ExecSysEr");
-		halt;
+		if (sysCallNo == 11) then		//---------------------------G E T - P I D------------------------------------------------------------------------------------
+			alias PID S2;
+			PID = (PTBR - PAGE_TABLE)/8;
+			[physicalSP - 2] = PID;
+			ireturn;
+
+		else
+			if (sysCallNo == 12) then	//---------------------------G E T - P P I D------------------------------------------------------------------------------------
+				alias currentPCB S2;
+
+				currentPCB = READY_LIST + ((PTBR - PAGE_TABLE)/8)*32;
+
+				[physicalSP - 2] = [currentPCB + 31];	//the  of the PCB last bit is used to store PARENT PID
+				ireturn;
+			endif;
+		endif;		
 endif;
