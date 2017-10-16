@@ -59,6 +59,21 @@ while (counter < 32) do				//32 PCBs
 	counter = counter + 1;			//set as terminated
 endwhile;
 
+alias i S1;
+i =0;
+counter =0;
+while (counter <32) do
+	i = 15;
+	while (i<32) do
+		[READY_LIST + 32*counter + i] = -1;
+		[READY_LIST + 32*counter + i + 1] = 0;
+		i = i + 2;
+	endwhile;
+	
+	counter = counter + 1;
+endwhile;
+
+
 //##################### S E T T I N G - D I S K - F R E E - L I S T ######################
 counter = 448;			//SWAP BLOCKS ARE UNSET
 while (counter < 512) do

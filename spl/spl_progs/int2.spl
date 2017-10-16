@@ -71,18 +71,19 @@ if (sysCallNo == 2) then 		// 	O P E N -----------------------------------------
 	currentPCB = READY_LIST + ((PTBR - PAGE_TABLE) / 8) * 32;	//Btw the current PTBR will give the process number 														
 									//and using PID find PCB
 
-	
+	breakpoint;
 	flag = 0;
 	while (k < 8) do 
 		if ([currentPCB + 15 + k*2] == -1) then
 			flag = 1;
+			breakpoint;
 			[currentPCB + 15 + k*2] = j; 		// set PCB values
 			[currentPCB + 15 + k*2 + 1] = 0;	// set PCB values
 			break;
 		endif;
 		k = k +1;
 	endwhile;
-	
+	breakpoint;
 	if (flag == 0) then 
 		[physicalSP - 2] = -1; 					//Failure as NO FREE entry in Per process file table
 		print("OP~FrPPFT");

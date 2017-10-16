@@ -14,10 +14,13 @@ enddecl
 
 integer main()
 {	a = Create("array1.dat");
-	a = Create("array2.dat");
-	a = Create("array3.dat");
-	breakpoint;
 	//print(a);
+	a = Create("array2.dat");
+	//print(a);
+	a = Create("array3.dat");
+	//print(a);
+	breakpoint;
+	
 
 	a= Open("array1.dat");
 	b= Open("array2.dat");
