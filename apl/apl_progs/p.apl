@@ -5,6 +5,12 @@ decl
 enddecl
 
 integer main(){
+
+	a=Delete("a.dat");
+	a=Delete("b.dat");
+	a=Delete("c.dat");
+	a=Delete("d.dat");
+
 	pid1 = Fork();
 	pid2 = Fork();
 
@@ -79,7 +85,6 @@ integer main(){
 		temp1 = 0;
 		while (i < 1000) do
 			c = Write(a,i);
-
 			i = i + 10;
 			temp1 = temp1 + 1;
 		endwhile;

@@ -8,6 +8,7 @@ integer merge()
 	integer a,b,i,j,len1,len2,len;
 	status=Read(f1,len1);
 	status=Read(f2,len2);
+	
 	len=len1+len2;
 	status=Write(fp,len);
 
@@ -36,7 +37,7 @@ integer merge()
 
 	while(j<len2) do
 		status=Write(fp,b);
-		status=Write(f2,b);
+		status=Read(f2,b);
 		j=j+1;
 	endwhile;
 
@@ -46,6 +47,10 @@ integer merge()
 integer main()
 {	
 	integer file1,file2,file;
+	status=Delete("temp1.dat");
+	status=Delete("temp2.dat");
+	status=Delete("temp3.dat");
+
 	status=Create("temp1.dat");
 	status=Create("temp2.dat");
 	status=Create("temp3.dat");
